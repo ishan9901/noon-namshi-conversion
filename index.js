@@ -94,10 +94,22 @@ for (let noon of noon_format) {
 
         const item = namshi_format[noon[namshi_to_noon_headers["product_id"]]];
 
-        const sizekey = getSize(noon);
-
         if (item) {
-            item[sizekey] = noon.sku;
+
+            if (item.sizerun == "UNDEFINED") {
+
+                for (let i = 2; i <= 152; i++) {
+                    if (!item[`SN${i}`]) {
+                        item[`SN${i}`] = noon.sku;
+                        break;
+                    }
+                }
+
+            } else {
+                const sizekey = getSize(item, noon);
+                item[sizekey] = noon.sku;
+            }
+
             continue;
         }
 
@@ -107,7 +119,7 @@ for (let noon of noon_format) {
             "brand_key": noon[namshi_to_noon_headers["brand_key"]],
             "supplier_sku": noon[namshi_to_noon_headers["supplier_sku"]],
             "product_id": noon[namshi_to_noon_headers["product_id"]],
-            "color": ColorMap[noon[namshi_to_noon_headers["color"]]?.toLowerCase().trim()],
+            "color": ColorMap[noon[namshi_to_noon_headers["color"]]?.toLowerCase().trim()] || "UNDEFINED",
             "name_en": noon[namshi_to_noon_headers["name_en"]],
             "name_ar": noon[namshi_to_noon_headers["name_en"]],
             "short_description_en": noon[namshi_to_noon_headers["short_description_en"]],
@@ -121,22 +133,27 @@ for (let noon of noon_format) {
             "basic_type": categoryDetail["basic_type"],
             "occasion": categoryDetail["occasion"],
             "product_detail": categoryDetail["product_detail"],
-            "country_of_origin": CountryMap[noon[namshi_to_noon_headers["country_of_origin"]]?.toLowerCase().trim()],
+            "country_of_origin": CountryMap[noon[namshi_to_noon_headers["country_of_origin"]]?.toLowerCase().trim()] || "UNDEFINED",
             "warranty": noon[namshi_to_noon_headers["warranty"]],
             "dangerous_good_type": noon[namshi_to_noon_headers["dangerous_good_type"]],
             "images": noon[namshi_to_noon_headers["images"]],
             "unit_cost": noon[namshi_to_noon_headers["unit_cost"]],
             "original_price": noon[namshi_to_noon_headers["original_price"]],
-            "sizerun": categoryDetail["sizerun"]
+            "sizerun": categoryDetail["sizerun"] || "UNDEFINED"
         };
 
-        namshiObj[sizekey] = noon.sku;
+        if (namshiObj.sizerun == "UNDEFINED") {
+            namshiObj["SN1"] = noon.sku;
+        } else {
+            const sizekey = getSize(namshiObj, noon);
+            namshiObj[sizekey] = noon.sku;
+        }
 
         namshi_format[namshiObj.product_id] = namshiObj;
 
     }
     catch (err) {
-        console.log('err', err.message);
+        console.log('err', err);
     }
 
 };
@@ -152,11 +169,11 @@ namshi_format.unshift(colNames);
 
 const ws = reader.utils.json_to_sheet(namshi_format);
 
-const newFile = reader.utils.book_new();
+// const newFile = reader.utils.book_new();
 
-reader.utils.book_append_sheet(newFile, ws, "namshi_format");
+reader.utils.book_append_sheet(file3, ws, "namshi_format");
 
-reader.writeFile(newFile, './n2n-code-converted.xlsx');
+reader.writeFile(file3, './noon-data.xlsx');
 
 // Functions
 
@@ -176,7 +193,17 @@ function getCategoryData(noon) {
 
     });
 
-    if (!categoryDetail) return {};
+    if (!categoryDetail) return {
+        "age_group": "UNDEFINED",
+        "gender": "UNDEFINED",
+        "department": "UNDEFINED",
+        "category": "UNDEFINED",
+        "sub_category": "UNDEFINED",
+        "basic_type": "UNDEFINED",
+        "occasion": "UNDEFINED",
+        "product_detail": "UNDEFINED",
+        "sizerun": "UNDEFINED",
+    };
 
     return {
         "age_group": categoryDetail["age_group"],
@@ -192,14 +219,22 @@ function getCategoryData(noon) {
 
 }
 
-function getSize(noon) {
+function getSize(item, noon) {
 
-    const sizeRun = size_runs.find(run => run.size_run.toLowerCase() == "MEN Tops XS-4XL".toLowerCase());
+    let sizeRun = size_runs.find(run => run.size_run.toLowerCase() == item.sizerun.toLowerCase());
+
+    if (!sizeRun) sizeRun = {};
 
     for (let size in sizeRun) {
 
         if (sizeRun[size].toLowerCase() == noon.size.toLowerCase()) return size;
 
+    }
+
+    for (let i = 1; i <= 100; i++) {
+        if (!item[`SN${i}`]) {
+            return `SN${i}`;
+        }
     }
 
 };
